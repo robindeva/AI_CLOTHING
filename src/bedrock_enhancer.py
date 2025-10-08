@@ -63,31 +63,71 @@ class BedrockEnhancer:
             # Encode image to base64
             image_base64 = base64.b64encode(image_bytes).decode('utf-8')
 
-            prompt = f"""You are an expert fashion consultant analyzing body measurements from a photo.
+            prompt = f"""You are an expert tailor and body measurement specialist with 20+ years of experience. Your task is to analyze this photo and provide PRECISE body measurements for clothing sizing.
 
-I have initial measurements calculated from body keypoint detection:
+INITIAL MEASUREMENTS (from keypoint detection):
 {json.dumps(basic_measurements, indent=2)}
 
-Please analyze the photo and refine these measurements considering:
-1. Actual body shape and proportions visible in the image
-2. Whether clothing is loose/tight (affects measurement accuracy)
-3. Camera angle and perspective distortion
-4. Body type (athletic, slim, average, curvy, plus-size)
-5. Posture and stance
+YOUR TASK: Carefully analyze the photo and refine these measurements using your expert knowledge.
 
-Provide refined measurements in centimeters. If the initial measurements look accurate, you can keep them the same.
+CRITICAL ANALYSIS STEPS:
 
-Respond ONLY with valid JSON (no markdown):
+1. CLOTHING FIT ASSESSMENT:
+   - Baggy/Oversized clothing: REDUCE chest/waist/hips by 6-10cm
+   - Loose fit: REDUCE by 3-5cm
+   - Fitted clothing: REDUCE by 1-2cm
+   - Tight/Athletic wear: Keep measurements as-is
+   - Thick jackets/coats: REDUCE by 8-12cm
+
+2. BODY PROPORTIONS CHECK:
+   - Chest should be 15-25cm larger than waist for men
+   - Chest should be 10-20cm larger than waist for women
+   - Hips typically 2-8cm larger than waist for women
+   - Shoulder width should be 35-50cm for adults
+   - Flag if proportions seem unrealistic
+
+3. CAMERA ANGLE CORRECTION:
+   - Low angle (camera below chest): REDUCE vertical measurements by 5-8%
+   - High angle (camera above head): INCREASE vertical measurements by 5-8%
+   - Angled body (not straight-on): Adjust width measurements accordingly
+   - Distance: Far photos may underestimate, close-up may overestimate
+
+4. BODY TYPE CLASSIFICATION (be specific):
+   - Athletic: Broad shoulders, defined muscles, low body fat
+   - Slim/Lean: Narrow frame, minimal curves, chest-waist difference <15cm
+   - Average: Moderate proportions, chest-waist difference 15-20cm
+   - Curvy: Pronounced hip-to-waist ratio >0.75, fuller bust/hips
+   - Plus-size: Larger overall frame, rounder proportions
+
+5. QUALITY CHECKS:
+   - Adult chest: 75-130cm (typical range)
+   - Adult waist: 60-120cm (typical range)
+   - Adult hips: 80-140cm (typical range)
+   - Shoulder: 35-55cm (typical range)
+   - Reject obvious errors (e.g., chest < waist is usually wrong)
+
+ADJUSTMENT GUIDELINES:
+- Make small adjustments (±2-5cm) if clothing looks fitted
+- Make larger adjustments (±6-12cm) for baggy/oversized clothing
+- If keypoint measurements look accurate, keep them (±0-2cm change)
+- Set confidence_boost based on photo quality:
+  * +15 to +20: Excellent photo (front-facing, good lighting, fitted clothes)
+  * +5 to +10: Good photo (minor issues)
+  * 0: Average photo (multiple issues present)
+  * -5 to -15: Poor photo (bad angle, baggy clothes, poor lighting)
+
+OUTPUT REQUIREMENTS:
+Respond ONLY with valid JSON (no markdown, no explanations outside JSON):
 {{
-  "chest": <number>,
-  "waist": <number>,
-  "hips": <number>,
-  "inseam": <number>,
-  "shoulder": <number>,
-  "arm": <number>,
-  "confidence_boost": <number -20 to +20>,
+  "chest": <number in cm, rounded to 1 decimal>,
+  "waist": <number in cm, rounded to 1 decimal>,
+  "hips": <number in cm, rounded to 1 decimal>,
+  "inseam": <number in cm, rounded to 1 decimal>,
+  "shoulder": <number in cm, rounded to 1 decimal>,
+  "arm": <number in cm, rounded to 1 decimal>,
+  "confidence_boost": <integer from -20 to +20>,
   "body_type": "<athletic|slim|average|curvy|plus-size>",
-  "adjustment_reason": "<brief explanation if measurements were changed>"
+  "adjustment_reason": "<explain key adjustments made, e.g., 'Reduced chest by 8cm due to baggy hoodie, adjusted for slight camera angle'>"
 }}"""
 
             response = self.bedrock_runtime.invoke_model(
@@ -185,23 +225,45 @@ Respond ONLY with valid JSON (no markdown):
             sorted_sizes = sorted(all_size_scores.items(), key=lambda x: x[1], reverse=True)
             alternative_size = sorted_sizes[1][0] if len(sorted_sizes) > 1 else None
 
-            prompt = f"""You are a helpful fashion stylist. A customer just got sized with these measurements:
+            prompt = f"""You are an expert personal stylist helping a customer understand their clothing size recommendation.
 
-Measurements (cm): {json.dumps(measurements, indent=2)}
-Recommended Size: {recommended_size}
-Confidence: {confidence}%
-Gender Category: {gender}
-Alternative Size: {alternative_size} (if they want different fit)
+CUSTOMER MEASUREMENTS:
+- Chest: {measurements.get('chest')}cm
+- Waist: {measurements.get('waist')}cm
+- Hips: {measurements.get('hips')}cm
+- Shoulder: {measurements.get('shoulder')}cm
 
-Create a friendly, helpful explanation (2-3 sentences) that:
-1. Confirms the size recommendation
-2. Mentions if any measurements are borderline between sizes
-3. Suggests the alternative size if they prefer looser/tighter fit
-4. Sounds natural and conversational
+SIZING RESULTS:
+- Recommended Size: {recommended_size}
+- Confidence Level: {confidence}%
+- Next Best Alternative: {alternative_size}
+- Gender Category: {gender}
 
-Keep it concise and helpful. Don't use technical jargon.
+YOUR TASK: Write a personalized 2-3 sentence explanation that is warm, confident, and actionable.
 
-Respond with just the explanation text (no JSON, no extra formatting)."""
+GUIDELINES:
+1. START with confidence: If confidence >85%, say "Perfect fit!" or "Great match!". If 70-85%, say "Good fit" or "We recommend". If <70%, acknowledge uncertainty.
+
+2. EXPLAIN the reasoning: Mention which measurement(s) are most aligned with this size (e.g., "Your chest and shoulder measurements align perfectly with size M")
+
+3. OFFER ALTERNATIVES when relevant:
+   - If confidence <80%, suggest trying the alternative size
+   - If customer is between sizes, mention fit preference (e.g., "If you prefer a looser fit, size L would also work well")
+   - If measurements are borderline, note which measurement drove the decision
+
+4. BE SPECIFIC AND HELPFUL:
+   - Don't just say "good fit" - explain WHY
+   - Reference actual body measurements when relevant
+   - Sound like a knowledgeable friend, not a robot
+
+TONE: Friendly, confident, professional but approachable
+
+EXAMPLE GOOD RESPONSES:
+- "Perfect match! Your chest (96cm) and shoulders (44cm) fit squarely in the Medium range. This size will give you a comfortable, true-to-size fit."
+- "We recommend size Large based on your measurements. Your chest and hips align well with this size, though if you prefer a more fitted look, Medium could also work."
+- "Size Small is your best fit! Your proportions are right in the middle of this size range. You'll get a flattering, comfortable fit without being too tight or too loose."
+
+Respond with ONLY the explanation text (no labels, no JSON, no extra formatting)."""
 
             response = self.bedrock_runtime.invoke_model(
                 modelId=self.model_id,
