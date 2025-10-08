@@ -109,7 +109,7 @@ resource "aws_iam_role" "lambda_role" {
   })
 }
 
-# IAM policy for Lambda to access S3 and CloudWatch
+# IAM policy for Lambda to access S3, CloudWatch, and Bedrock
 resource "aws_iam_role_policy" "lambda_policy" {
   name = "ai_clothing_lambda_policy"
   role = aws_iam_role.lambda_role.id
@@ -137,6 +137,16 @@ resource "aws_iam_role_policy" "lambda_policy" {
           "logs:PutLogEvents"
         ]
         Resource = "arn:aws:logs:*:*:*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "bedrock:InvokeModel",
+          "bedrock:InvokeModelWithResponseStream"
+        ]
+        Resource = [
+          "arn:aws:bedrock:${var.aws_region}::foundation-model/amazon.nova-pro-v1:0"
+        ]
       }
     ]
   })
@@ -153,7 +163,8 @@ resource "aws_lambda_function" "size_recommender" {
 
   environment {
     variables = {
-      BUCKET_NAME = aws_s3_bucket.images.id
+      BUCKET_NAME    = aws_s3_bucket.images.id
+      ENABLE_BEDROCK = "true"
     }
   }
 

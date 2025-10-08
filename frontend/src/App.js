@@ -153,12 +153,19 @@ function App() {
             <div className="result-section">
               <div className="result-card">
                 <h2>Your Recommended Size</h2>
+                {result.ai_enhanced && (
+                  <div className="ai-badge">
+                    ✨ AI-Enhanced Analysis
+                    {result.body_type && <span className="body-type"> • {result.body_type}</span>}
+                  </div>
+                )}
                 <div className="size-badge">
                   <span className="size">{result.recommended_size}</span>
                 </div>
                 <div className="confidence-bar">
                   <div className="confidence-label">
                     Confidence: {result.confidence}%
+                    {result.ai_enhanced && <span className="ai-boost"> (AI Verified)</span>}
                   </div>
                   <div className="progress-bar">
                     <div

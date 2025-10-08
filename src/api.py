@@ -11,6 +11,7 @@ from datetime import datetime
 from src.pose_detector import BodyKeypointDetector
 from src.measurement_estimator import MeasurementEstimator
 from src.size_recommender import SizeRecommender, Gender
+from src.bedrock_enhancer import BedrockEnhancer
 
 
 app = FastAPI(title="AI Clothing Size Recommendation API")
@@ -27,6 +28,7 @@ app.add_middleware(
 # Initialize components
 detector = BodyKeypointDetector()
 estimator = MeasurementEstimator()
+bedrock = BedrockEnhancer(enabled=True)  # Hybrid AI enhancement
 
 # AWS S3 client (optional - for storing images)
 s3_client = boto3.client('s3')
@@ -41,6 +43,8 @@ class SizeRecommendationResponse(BaseModel):
     measurements: dict
     all_size_scores: dict
     image_url: Optional[str] = None
+    ai_enhanced: Optional[bool] = False  # Whether Bedrock AI was used
+    body_type: Optional[str] = None  # Detected body type from AI
 
 
 @app.get("/")
@@ -93,18 +97,43 @@ async def analyze_body_measurements(
         # Generate request ID
         request_id = str(uuid.uuid4())
 
-        # Step 1: Detect keypoints and estimate scale
+        # Step 1: Detect keypoints and estimate scale (MediaPipe)
         detection_result = detector.process_image(image_bytes)
 
-        # Step 2: Estimate measurements
-        measurements = estimator.estimate_measurements(
+        # Step 2: Estimate basic measurements (geometric calculation)
+        basic_measurements = estimator.estimate_measurements(
             detection_result["keypoints"],
             detection_result["scale"]
         )
 
-        # Step 3: Recommend size
+        # Step 3: Enhance measurements with Bedrock AI (hybrid approach)
+        enhanced_measurements = bedrock.enhance_measurements(
+            detection_result["keypoints"],
+            basic_measurements,
+            image_bytes
+        )
+
+        # Extract clean measurements (remove metadata)
+        measurements = {k: v for k, v in enhanced_measurements.items() if not k.startswith('_')}
+
+        # Step 4: Recommend size based on enhanced measurements
         recommender = SizeRecommender(gender_enum)
         recommendation = recommender.recommend_size(measurements)
+
+        # Step 5: Enhance explanation with Bedrock AI
+        if enhanced_measurements.get('_bedrock_enhanced', False):
+            # Boost confidence if Bedrock is confident
+            confidence_boost = enhanced_measurements.get('_confidence_boost', 0)
+            recommendation['confidence'] = min(100, max(0, recommendation['confidence'] + confidence_boost))
+
+            # Generate smarter explanation
+            recommendation['explanation'] = bedrock.generate_smart_explanation(
+                measurements,
+                recommendation['recommended_size'],
+                recommendation['confidence'],
+                recommendation['all_size_scores'],
+                gender
+            )
 
         # Optional: Store image in S3
         image_url = None
@@ -129,7 +158,9 @@ async def analyze_body_measurements(
             explanation=recommendation["explanation"],
             measurements=recommendation["measurements"],
             all_size_scores=recommendation["all_size_scores"],
-            image_url=image_url
+            image_url=image_url,
+            ai_enhanced=enhanced_measurements.get('_bedrock_enhanced', False),
+            body_type=enhanced_measurements.get('_body_type')
         )
 
     except ValueError as e:
