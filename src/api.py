@@ -1,0 +1,214 @@
+from fastapi import FastAPI, File, UploadFile, HTTPException, Form
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from typing import Optional
+import boto3
+from mangum import Mangum
+import json
+import uuid
+from datetime import datetime
+
+from src.pose_detector import BodyKeypointDetector
+from src.measurement_estimator import MeasurementEstimator
+from src.size_recommender import SizeRecommender, Gender
+
+
+app = FastAPI(title="AI Clothing Size Recommendation API")
+
+# CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Initialize components
+detector = BodyKeypointDetector()
+estimator = MeasurementEstimator()
+
+# AWS S3 client (optional - for storing images)
+s3_client = boto3.client('s3')
+BUCKET_NAME = "ai-clothing-images"  # Change to your bucket name
+
+
+class SizeRecommendationResponse(BaseModel):
+    request_id: str
+    recommended_size: str
+    confidence: int
+    explanation: str
+    measurements: dict
+    all_size_scores: dict
+    image_url: Optional[str] = None
+
+
+@app.get("/")
+async def root():
+    return {
+        "message": "AI Clothing Size Recommendation API",
+        "version": "1.0.0",
+        "endpoints": {
+            "/analyze": "POST - Upload photo and get size recommendation",
+            "/health": "GET - Health check"
+        }
+    }
+
+
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy", "timestamp": datetime.utcnow().isoformat()}
+
+
+@app.post("/analyze", response_model=SizeRecommendationResponse)
+async def analyze_body_measurements(
+    image: UploadFile = File(...),
+    gender: str = Form("unisex"),
+    store_image: bool = Form(False)
+):
+    """
+    Analyze uploaded photo and return size recommendation.
+
+    Args:
+        image: Photo of person (full body, front-facing preferred)
+        gender: male/female/unisex
+        store_image: Whether to store image in S3 (optional)
+
+    Returns:
+        Size recommendation with confidence and explanation
+    """
+    try:
+        # Validate gender
+        try:
+            gender_enum = Gender(gender.lower())
+        except ValueError:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid gender. Must be one of: {', '.join([g.value for g in Gender])}"
+            )
+
+        # Read image bytes
+        image_bytes = await image.read()
+
+        # Generate request ID
+        request_id = str(uuid.uuid4())
+
+        # Step 1: Detect keypoints and estimate scale
+        detection_result = detector.process_image(image_bytes)
+
+        # Step 2: Estimate measurements
+        measurements = estimator.estimate_measurements(
+            detection_result["keypoints"],
+            detection_result["scale"]
+        )
+
+        # Step 3: Recommend size
+        recommender = SizeRecommender(gender_enum)
+        recommendation = recommender.recommend_size(measurements)
+
+        # Optional: Store image in S3
+        image_url = None
+        if store_image:
+            try:
+                s3_key = f"uploads/{request_id}/{image.filename}"
+                s3_client.put_object(
+                    Bucket=BUCKET_NAME,
+                    Key=s3_key,
+                    Body=image_bytes,
+                    ContentType=image.content_type
+                )
+                image_url = f"https://{BUCKET_NAME}.s3.amazonaws.com/{s3_key}"
+            except Exception as e:
+                # Log error but don't fail the request
+                print(f"Failed to store image in S3: {str(e)}")
+
+        return SizeRecommendationResponse(
+            request_id=request_id,
+            recommended_size=recommendation["recommended_size"],
+            confidence=recommendation["confidence"],
+            explanation=recommendation["explanation"],
+            measurements=recommendation["measurements"],
+            all_size_scores=recommendation["all_size_scores"],
+            image_url=image_url
+        )
+
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+
+@app.post("/analyze-with-custom-chart")
+async def analyze_with_custom_chart(
+    image: UploadFile = File(...),
+    gender: str = Form("unisex"),
+    size_chart: str = Form(...)
+):
+    """
+    Analyze with store-specific size chart.
+
+    size_chart should be JSON string with format:
+    {
+        "S": {"chest": [86, 91], "waist": [71, 76], ...},
+        "M": {"chest": [91, 97], "waist": [76, 81], ...},
+        ...
+    }
+    """
+    try:
+        # Parse custom size chart
+        try:
+            custom_chart = json.loads(size_chart)
+        except json.JSONDecodeError:
+            raise HTTPException(status_code=400, detail="Invalid size_chart JSON format")
+
+        # Validate gender
+        try:
+            gender_enum = Gender(gender.lower())
+        except ValueError:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid gender. Must be one of: {', '.join([g.value for g in Gender])}"
+            )
+
+        # Read image
+        image_bytes = await image.read()
+        request_id = str(uuid.uuid4())
+
+        # Process image
+        detection_result = detector.process_image(image_bytes)
+        measurements = estimator.estimate_measurements(
+            detection_result["keypoints"],
+            detection_result["scale"]
+        )
+
+        # Use custom size chart
+        recommender = SizeRecommender(gender_enum)
+
+        # Convert list format to tuple format
+        converted_chart = {}
+        for size, measures in custom_chart.items():
+            converted_chart[size] = {
+                k: tuple(v) if isinstance(v, list) else v
+                for k, v in measures.items()
+            }
+
+        recommender.set_custom_size_chart(converted_chart)
+        recommendation = recommender.recommend_size(measurements)
+
+        return SizeRecommendationResponse(
+            request_id=request_id,
+            recommended_size=recommendation["recommended_size"],
+            confidence=recommendation["confidence"],
+            explanation=recommendation["explanation"],
+            measurements=recommendation["measurements"],
+            all_size_scores=recommendation["all_size_scores"]
+        )
+
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+
+# AWS Lambda handler
+handler = Mangum(app, lifespan="off", api_gateway_base_path="/prod")
