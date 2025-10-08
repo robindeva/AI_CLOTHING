@@ -1,7 +1,7 @@
 from fastapi import FastAPI, File, UploadFile, HTTPException, Form
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 import boto3
 from mangum import Mangum
 import json
@@ -12,6 +12,7 @@ from src.pose_detector import BodyKeypointDetector
 from src.measurement_estimator import MeasurementEstimator
 from src.size_recommender import SizeRecommender, Gender
 from src.bedrock_enhancer import BedrockEnhancer
+from src.image_validator import ImageValidator
 
 
 app = FastAPI(title="AI Clothing Size Recommendation API")
@@ -29,6 +30,7 @@ app.add_middleware(
 detector = BodyKeypointDetector()
 estimator = MeasurementEstimator()
 bedrock = BedrockEnhancer(enabled=True)  # Hybrid AI enhancement
+validator = ImageValidator()  # Image and pose validation
 
 # AWS S3 client (optional - for storing images)
 s3_client = boto3.client('s3')
@@ -45,6 +47,8 @@ class SizeRecommendationResponse(BaseModel):
     image_url: Optional[str] = None
     ai_enhanced: Optional[bool] = False  # Whether Bedrock AI was used
     body_type: Optional[str] = None  # Detected body type from AI
+    quality_score: Optional[int] = None  # Overall image/pose quality (0-100)
+    quality_warnings: Optional[List[str]] = None  # Quality warnings if any
 
 
 @app.get("/")
@@ -97,8 +101,30 @@ async def analyze_body_measurements(
         # Generate request ID
         request_id = str(uuid.uuid4())
 
+        # Step 0: Validate image quality
+        img_valid, img_error, quality_metrics = validator.validate_image_quality(image_bytes)
+        if not img_valid:
+            raise HTTPException(status_code=400, detail=img_error)
+
         # Step 1: Detect keypoints and estimate scale (MediaPipe)
         detection_result = detector.process_image(image_bytes)
+
+        # Step 1.5: Validate pose quality
+        pose_valid, pose_error, pose_metrics = validator.validate_pose_quality(detection_result["keypoints"])
+        if not pose_valid:
+            raise HTTPException(status_code=400, detail=pose_error)
+
+        # Calculate overall quality score
+        quality_score = validator.get_quality_score(quality_metrics, pose_metrics)
+        quality_warnings = []
+
+        # Add warnings for suboptimal conditions
+        if quality_metrics.get("brightness", 128) < 80:
+            quality_warnings.append("Photo could be brighter for better accuracy")
+        if pose_metrics.get("front_facing_score", 1.0) < 0.85:
+            quality_warnings.append("Face the camera more directly for improved measurements")
+        if pose_metrics.get("visibility_ratio", 1.0) < 0.85:
+            quality_warnings.append("Some body parts are partially hidden")
 
         # Step 2: Estimate basic measurements (geometric calculation)
         basic_measurements = estimator.estimate_measurements(
@@ -160,7 +186,9 @@ async def analyze_body_measurements(
             all_size_scores=recommendation["all_size_scores"],
             image_url=image_url,
             ai_enhanced=enhanced_measurements.get('_bedrock_enhanced', False),
-            body_type=enhanced_measurements.get('_body_type')
+            body_type=enhanced_measurements.get('_body_type'),
+            quality_score=quality_score,
+            quality_warnings=quality_warnings if quality_warnings else None
         )
 
     except ValueError as e:

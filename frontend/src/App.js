@@ -153,6 +153,21 @@ function App() {
             <div className="result-section">
               <div className="result-card">
                 <h2>Your Recommended Size</h2>
+
+                {result.quality_score && (
+                  <div className={`quality-badge ${result.quality_score >= 80 ? 'quality-good' : result.quality_score >= 60 ? 'quality-fair' : 'quality-poor'}`}>
+                    Photo Quality: {result.quality_score}/100
+                  </div>
+                )}
+
+                {result.quality_warnings && result.quality_warnings.length > 0 && (
+                  <div className="quality-warnings">
+                    {result.quality_warnings.map((warning, idx) => (
+                      <div key={idx} className="warning-item">⚠️ {warning}</div>
+                    ))}
+                  </div>
+                )}
+
                 {result.ai_enhanced && (
                   <div className="ai-badge">
                     ✨ AI-Enhanced Analysis
