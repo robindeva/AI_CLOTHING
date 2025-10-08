@@ -115,7 +115,7 @@ Respond ONLY with valid JSON (no markdown):
                     ],
                     "inferenceConfig": {
                         "max_new_tokens": 1000,
-                        "temperature": 0.3
+                        "temperature": 0.1
                     }
                 })
             )
@@ -220,7 +220,7 @@ Respond with just the explanation text (no JSON, no extra formatting)."""
                     ],
                     "inferenceConfig": {
                         "max_new_tokens": 300,
-                        "temperature": 0.7
+                        "temperature": 0.2
                     }
                 })
             )
