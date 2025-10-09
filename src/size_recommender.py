@@ -52,7 +52,7 @@ class SizeRecommender:
 
     def recommend_size(self, measurements: Dict[str, float]) -> Dict:
         """
-        Recommend size based on measurements.
+        Recommend shirt size based on measurements (improved accuracy).
 
         Args:
             measurements: Dict with keys: chest, waist, hips, inseam, shoulder, arm
@@ -60,11 +60,21 @@ class SizeRecommender:
         Returns:
             Dict with recommended_size, confidence, and explanation
         """
-        # Calculate fit score for each size
+        # Calculate fit score for each size using shirt-optimized weights
         size_scores = {}
 
+        # Shirt-optimized weights (focus on upper body)
+        shirt_weights = {
+            "chest": 3.5,      # Most important for shirts
+            "shoulder": 2.5,   # Critical for fit
+            "arm": 1.5,        # Important for sleeve length
+            "waist": 0.0,      # Not used for shirt sizing
+            "hips": 0.0,       # Not used for shirt sizing
+            "inseam": 0.0      # Not used for shirt sizing
+        }
+
         for size, size_ranges in self.size_chart.items():
-            score = self._calculate_fit_score(measurements, size_ranges)
+            score = self._calculate_fit_score_weighted(measurements, size_ranges, shirt_weights)
             size_scores[size] = score
 
         # Find best matching size
@@ -86,6 +96,48 @@ class SizeRecommender:
             "measurements": measurements,
             "all_size_scores": size_scores
         }
+
+    def _calculate_fit_score_weighted(self, measurements: Dict[str, float], size_ranges: Dict, weights: Dict[str, float]) -> float:
+        """
+        Calculate how well measurements fit a given size with custom weights.
+        Returns score 0-100 (higher is better).
+        """
+        scores = []
+
+        for measurement_name, value in measurements.items():
+            if measurement_name not in size_ranges or measurement_name not in weights:
+                continue
+
+            weight = weights[measurement_name]
+            if weight == 0:  # Skip measurements with zero weight
+                continue
+
+            min_val, max_val = size_ranges[measurement_name]
+
+            # Check if measurement falls within range
+            if min_val <= value <= max_val:
+                # Perfect fit - center of range gets 100
+                range_center = (min_val + max_val) / 2
+                range_width = max_val - min_val
+                deviation = abs(value - range_center)
+                score = 100 * (1 - deviation / (range_width / 2))
+            else:
+                # Outside range - penalize based on distance
+                if value < min_val:
+                    distance = min_val - value
+                else:
+                    distance = value - max_val
+
+                # Reduce score based on distance (cm)
+                score = max(0, 100 - (distance * 10))
+
+            scores.append(score * weight)
+
+        # Weighted average
+        total_weight = sum(w for w in weights.values() if w > 0)
+        final_score = sum(scores) / total_weight if scores and total_weight > 0 else 0
+
+        return final_score
 
     def _calculate_fit_score(self, measurements: Dict[str, float], size_ranges: Dict) -> float:
         """
@@ -160,15 +212,15 @@ class SizeRecommender:
             elif value > max_val:
                 tight_measurements.append(measurement_name)
 
-        # Build explanation
+        # Build explanation with "Shirt Size" label
         if score >= 90:
-            explanation = f"Excellent fit. Size {recommended_size} matches your measurements closely."
+            explanation = f"Shirt Size: {recommended_size}. Excellent fit - matches your chest ({measurements['chest']:.1f}cm) and shoulders ({measurements['shoulder']:.1f}cm) closely."
         elif score >= 75:
-            explanation = f"Good fit. Size {recommended_size} is recommended for your measurements."
+            explanation = f"Shirt Size: {recommended_size}. Good fit for your chest ({measurements['chest']:.1f}cm) and shoulders ({measurements['shoulder']:.1f}cm)."
         elif score >= 60:
-            explanation = f"Size {recommended_size} is recommended, but fit may vary."
+            explanation = f"Shirt Size: {recommended_size} recommended, but fit may vary by brand."
         else:
-            explanation = f"Size {recommended_size} is the closest match, but consider trying multiple sizes."
+            explanation = f"Shirt Size: {recommended_size} is the closest match. Consider trying adjacent sizes."
 
         # Add specific notes
         if tight_measurements:

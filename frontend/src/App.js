@@ -174,6 +174,7 @@ function App() {
                     {result.body_type && <span className="body-type"> • {result.body_type}</span>}
                   </div>
                 )}
+                <h3 className="size-label">Recommended Shirt Size</h3>
                 <div className="size-badge">
                   <span className="size">{result.recommended_size}</span>
                 </div>
