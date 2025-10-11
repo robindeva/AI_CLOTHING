@@ -32,6 +32,11 @@ function App() {
       return;
     }
 
+    if (!height || height < 100 || height > 250) {
+      setError('Please enter your height (between 100cm and 250cm)');
+      return;
+    }
+
     setLoading(true);
     setError(null);
     setResult(null);
@@ -39,9 +44,7 @@ function App() {
     const formData = new FormData();
     formData.append('image', selectedFile);
     formData.append('gender', gender);
-    if (height && height > 0) {
-      formData.append('height', height);
-    }
+    formData.append('height', height);
 
     try {
       const response = await axios.post(`${API_ENDPOINT}analyze`, formData, {
@@ -109,24 +112,25 @@ function App() {
 
               <div className="height-input-wrapper">
                 <label htmlFor="height-input" className="height-label">
-                  Your Height (optional - improves accuracy)
+                  Your Height (required) *
                 </label>
                 <div className="height-input-group">
                   <input
                     type="number"
                     id="height-input"
-                    placeholder="Enter height"
+                    placeholder="Enter height (e.g., 170)"
                     min="100"
                     max="250"
                     value={height}
                     onChange={(e) => setHeight(e.target.value)}
                     className="height-input"
+                    required
                   />
                   <span className="height-unit">cm</span>
                 </div>
-                {height && height > 0 && (
+                {height && height >= 100 && height <= 250 && (
                   <div className="height-info">
-                    ✓ Height-adjusted measurements for better accuracy
+                    ✓ Height entered: {height} cm
                   </div>
                 )}
               </div>
@@ -154,7 +158,7 @@ function App() {
                 <button
                   type="submit"
                   className="btn btn-primary"
-                  disabled={loading || !selectedFile}
+                  disabled={loading || !selectedFile || !height || height < 100 || height > 250}
                 >
                   {loading ? 'Analyzing...' : 'Get Size Recommendation'}
                 </button>

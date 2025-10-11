@@ -72,7 +72,7 @@ async def health_check():
 async def analyze_body_measurements(
     image: UploadFile = File(...),
     gender: str = Form("unisex"),
-    height: Optional[int] = Form(None),
+    height: int = Form(...),
     store_image: bool = Form(False)
 ):
     """
@@ -81,13 +81,20 @@ async def analyze_body_measurements(
     Args:
         image: Photo of person (full body, front-facing preferred)
         gender: male/female/unisex
-        height: Optional user height in cm (improves accuracy)
+        height: User height in cm (required for accurate measurements)
         store_image: Whether to store image in S3 (optional)
 
     Returns:
         Size recommendation with confidence and explanation
     """
     try:
+        # Validate height
+        if height < 100 or height > 250:
+            raise HTTPException(
+                status_code=400,
+                detail="Height must be between 100cm and 250cm"
+            )
+
         # Validate gender
         try:
             gender_enum = Gender(gender.lower())
