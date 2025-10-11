@@ -371,6 +371,51 @@
   text-align: right;
 }
 
+.height-input-wrapper {
+  margin-bottom: 1.5rem;
+}
+
+.height-label {
+  display: block;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #4b5563;
+  margin-bottom: 0.5rem;
+}
+
+.height-input-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.height-input {
+  flex: 1;
+  padding: 0.75rem 1rem;
+  border: 2px solid #e5e7eb;
+  border-radius: 0.5rem;
+  font-size: 1rem;
+  transition: border-color 0.2s;
+}
+
+.height-input:focus {
+  outline: none;
+  border-color: #667eea;
+}
+
+.height-unit {
+  font-weight: 600;
+  color: #6b7280;
+  font-size: 1rem;
+}
+
+.height-info {
+  margin-top: 0.5rem;
+  font-size: 0.85rem;
+  color: #10b981;
+  font-weight: 500;
+}
+
 .footer {
   text-align: center;
   margin-top: 3rem;

@@ -72,6 +72,7 @@ async def health_check():
 async def analyze_body_measurements(
     image: UploadFile = File(...),
     gender: str = Form("unisex"),
+    height: Optional[int] = Form(None),
     store_image: bool = Form(False)
 ):
     """
@@ -80,6 +81,7 @@ async def analyze_body_measurements(
     Args:
         image: Photo of person (full body, front-facing preferred)
         gender: male/female/unisex
+        height: Optional user height in cm (improves accuracy)
         store_image: Whether to store image in S3 (optional)
 
     Returns:
@@ -107,7 +109,8 @@ async def analyze_body_measurements(
             raise HTTPException(status_code=400, detail=img_error)
 
         # Step 1: Detect keypoints and estimate scale (MediaPipe)
-        detection_result = detector.process_image(image_bytes)
+        # Pass height if provided for accurate scale calculation
+        detection_result = detector.process_image(image_bytes, height)
 
         # Step 1.5: Validate pose quality
         pose_valid, pose_error, pose_metrics = validator.validate_pose_quality(detection_result["keypoints"])
@@ -138,6 +141,19 @@ async def analyze_body_measurements(
             basic_measurements,
             image_bytes
         )
+
+        # Step 3.5: If body type was detected, recalculate chest with body type adjustment
+        if enhanced_measurements.get('_body_type') and enhanced_measurements.get('_body_type') != 'unknown':
+            body_type = enhanced_measurements['_body_type']
+            # Recalculate chest with body-type-aware multiplier
+            refined_chest = estimator._estimate_chest(
+                detection_result["keypoints"],
+                detection_result["scale"],
+                body_type
+            )
+            # Use the more conservative estimate (average of Bedrock and body-type adjusted)
+            bedrock_chest = enhanced_measurements.get('chest', refined_chest)
+            enhanced_measurements['chest'] = round((bedrock_chest + refined_chest) / 2, 1)
 
         # Extract clean measurements (remove metadata)
         measurements = {k: v for k, v in enhanced_measurements.items() if not k.startswith('_')}

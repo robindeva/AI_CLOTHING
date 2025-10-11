@@ -177,13 +177,15 @@ Respond ONLY with valid JSON (no markdown, no explanations outside JSON):
                 else:
                     enhanced_measurements[key] = basic_measurements[key]
 
+            # Store body type and keypoints for potential recalculation
             return {
                 **enhanced_measurements,
                 "_bedrock_enhanced": True,
                 "_confidence_boost": enhanced_data.get("confidence_boost", 0),
                 "_body_type": enhanced_data.get("body_type", "unknown"),
                 "_adjustment_reason": enhanced_data.get("adjustment_reason", ""),
-                "_original_measurements": basic_measurements
+                "_original_measurements": basic_measurements,
+                "_keypoints": keypoints  # Store for potential recalculation
             }
 
         except Exception as e:

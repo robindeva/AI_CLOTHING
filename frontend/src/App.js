@@ -9,6 +9,7 @@ function App() {
   const [selectedFile, setSelectedFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
   const [gender, setGender] = useState('unisex');
+  const [height, setHeight] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
@@ -38,6 +39,9 @@ function App() {
     const formData = new FormData();
     formData.append('image', selectedFile);
     formData.append('gender', gender);
+    if (height && height > 0) {
+      formData.append('height', height);
+    }
 
     try {
       const response = await axios.post(`${API_ENDPOINT}analyze`, formData, {
@@ -101,6 +105,30 @@ function App() {
                   />
                   Unisex
                 </label>
+              </div>
+
+              <div className="height-input-wrapper">
+                <label htmlFor="height-input" className="height-label">
+                  Your Height (optional - improves accuracy)
+                </label>
+                <div className="height-input-group">
+                  <input
+                    type="number"
+                    id="height-input"
+                    placeholder="Enter height"
+                    min="100"
+                    max="250"
+                    value={height}
+                    onChange={(e) => setHeight(e.target.value)}
+                    className="height-input"
+                  />
+                  <span className="height-unit">cm</span>
+                </div>
+                {height && height > 0 && (
+                  <div className="height-info">
+                    ✓ Height-adjusted measurements for better accuracy
+                  </div>
+                )}
               </div>
 
               <div className="file-input-wrapper">
