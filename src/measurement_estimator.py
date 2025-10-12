@@ -88,9 +88,12 @@ class MeasurementEstimator:
         shoulder_width_px = self._calculate_distance(left_shoulder, right_shoulder)
         shoulder_width_cm = shoulder_width_px / scale
 
+        # CRITICAL: Apply MediaPipe joint-to-edge correction before calculating chest
+        # MediaPipe measures joint-to-joint, but we need outer edge-to-edge
+        shoulder_width_cm = shoulder_width_cm * 1.17
+
         # Improved multipliers based on anthropometric research
-        # Chest circumference is typically 1.85-2.2x shoulder width
-        # (After applying 1.17x shoulder correction for MediaPipe joint-to-edge difference)
+        # Chest circumference is typically 1.85-2.2x corrected shoulder width
         if body_type:
             body_type_lower = body_type.lower()
             if "slim" in body_type_lower or "lean" in body_type_lower:
