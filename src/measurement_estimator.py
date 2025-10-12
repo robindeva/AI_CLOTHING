@@ -89,53 +89,70 @@ class MeasurementEstimator:
         shoulder_width_cm = shoulder_width_px / scale
 
         # Improved multipliers based on anthropometric research
-        # Chest circumference is typically 1.9-2.3x shoulder width (not 2.5x)
+        # Chest circumference is typically 1.85-2.2x shoulder width
+        # (After applying 1.17x shoulder correction for MediaPipe joint-to-edge difference)
         if body_type:
             body_type_lower = body_type.lower()
             if "slim" in body_type_lower or "lean" in body_type_lower:
-                multiplier = 1.95  # Smaller chest for slim builds
+                multiplier = 1.85  # Smaller chest for slim builds
             elif "athletic" in body_type_lower or "fit" in body_type_lower:
-                multiplier = 2.05  # Moderate chest for athletic builds
+                multiplier = 1.95  # Moderate chest for athletic builds
             elif "stocky" in body_type_lower or "heavy" in body_type_lower or "broad" in body_type_lower:
-                multiplier = 2.25  # Larger chest for stocky/heavy builds
+                multiplier = 2.15  # Larger chest for stocky/heavy builds
             elif "average" in body_type_lower or "medium" in body_type_lower:
-                multiplier = 2.05  # Standard multiplier
+                multiplier = 1.90  # Standard multiplier for average builds
             else:
-                multiplier = 2.05  # Default if body type unrecognized
+                multiplier = 1.90  # Default if body type unrecognized
         else:
             # Default multiplier when body type is not provided
-            multiplier = 2.05
+            multiplier = 1.90
 
         chest_circumference = shoulder_width_cm * multiplier
 
         return round(chest_circumference, 1)
 
     def _estimate_waist(self, keypoints: Dict, scale: float) -> float:
-        """Estimate waist circumference from hip width and torso structure."""
+        """
+        Estimate waist circumference from hip width and torso structure.
+
+        Note: MediaPipe hip keypoints are at the hip joints, not outer hip points.
+        Apply correction factor similar to shoulders.
+        """
         left_hip = keypoints["left_hip"]
         right_hip = keypoints["right_hip"]
 
         hip_width_px = self._calculate_distance(left_hip, right_hip)
         hip_width_cm = hip_width_px / scale
 
+        # Correction: MediaPipe measures joint-to-joint, actual hip width is wider
+        hip_width_cm = hip_width_cm * 1.17
+
         # Improved waist estimation
         # Waist is typically at the narrowest point between ribs and hips
-        # Natural waist circumference is roughly 2.8-3.2x hip bone width
-        waist_circumference = hip_width_cm * 3.0
+        # Natural waist circumference is roughly 2.5-2.8x actual hip width
+        waist_circumference = hip_width_cm * 2.55
 
         return round(waist_circumference, 1)
 
     def _estimate_hips(self, keypoints: Dict, scale: float) -> float:
-        """Estimate hip circumference."""
+        """
+        Estimate hip circumference.
+
+        Note: MediaPipe hip keypoints are at hip joints, not outer hip points.
+        Apply correction factor similar to shoulders.
+        """
         left_hip = keypoints["left_hip"]
         right_hip = keypoints["right_hip"]
 
         hip_width_px = self._calculate_distance(left_hip, right_hip)
         hip_width_cm = hip_width_px / scale
 
-        # Hip circumference is approximately 3.2-3.5x hip bone width
-        # Increased from 2.5x to better match actual body proportions
-        hip_circumference = hip_width_cm * 3.3
+        # Correction: MediaPipe measures joint-to-joint, actual hip width is wider
+        hip_width_cm = hip_width_cm * 1.17
+
+        # Hip circumference is approximately 2.9-3.2x actual hip width
+        # Adjusted after applying 1.17x correction factor
+        hip_circumference = hip_width_cm * 2.95
 
         return round(hip_circumference, 1)
 
@@ -172,17 +189,32 @@ class MeasurementEstimator:
         return round(inseam_cm, 1)
 
     def _estimate_shoulder(self, keypoints: Dict, scale: float) -> float:
-        """Estimate shoulder width."""
+        """
+        Estimate shoulder width.
+
+        Note: MediaPipe shoulder keypoints (11, 12) represent shoulder joints.
+        Actual tailoring shoulder width (acromion-to-acromion) is wider.
+        Apply correction factor of 1.17x to match real measurements.
+        """
         left_shoulder = keypoints["left_shoulder"]
         right_shoulder = keypoints["right_shoulder"]
 
         shoulder_width_px = self._calculate_distance(left_shoulder, right_shoulder)
         shoulder_width_cm = shoulder_width_px / scale
 
+        # Correction: MediaPipe measures joint-to-joint, but tailoring measures outer edge-to-outer edge
+        # Real shoulder width is typically 1.15-1.20x joint distance (based on anthropometric data)
+        shoulder_width_cm = shoulder_width_cm * 1.17
+
         return round(shoulder_width_cm, 1)
 
     def _estimate_arm_length(self, keypoints: Dict, scale: float) -> float:
-        """Estimate arm length (shoulder to wrist) - typically sleeve length measurement."""
+        """
+        Estimate arm length (shoulder to wrist) - typically sleeve length measurement.
+
+        Note: Sleeve length for tailoring is measured from center back neck, over shoulder, to wrist.
+        MediaPipe measures shoulder joint to wrist, which is shorter.
+        """
         # Average both arms for better accuracy
         left_shoulder = keypoints["left_shoulder"]
         left_elbow = keypoints["left_elbow"]
@@ -206,9 +238,10 @@ class MeasurementEstimator:
         avg_arm_length_px = (left_arm_length_px + right_arm_length_px) / 2
         arm_length_cm = avg_arm_length_px / scale
 
-        # Adjust for typical sleeve length (from center back neck to wrist is longer than shoulder to wrist)
-        # Shoulder-to-wrist is typically ~85-90% of the full sleeve measurement
-        # We're measuring shoulder joint to wrist, so reduce slightly for straight-line sleeve length
-        arm_length_cm = arm_length_cm * 0.88
+        # Adjustment for sleeve length
+        # MediaPipe measures shoulder joint to wrist (curved path along arm)
+        # Size charts typically use a straighter measurement
+        # Apply modest correction: multiply by 0.95 to get practical sleeve length
+        arm_length_cm = arm_length_cm * 0.95
 
         return round(arm_length_cm, 1)
