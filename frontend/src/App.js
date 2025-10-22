@@ -311,32 +311,6 @@ function App() {
                   )}
                 </div>
               </div>
-
-              <div className="size-scores-card">
-                <h3>All Size Scores</h3>
-                <div className="scores-list">
-                  {Object.entries(result.all_size_scores)
-                    .sort((a, b) => b[1] - a[1])
-                    .map(([size, score]) => (
-                      <div key={size} className="score-item">
-                        <span className="score-size">{size}</span>
-                        <div className="score-bar-container">
-                          <div
-                            className="score-bar"
-                            style={{
-                              width: `${score}%`,
-                              backgroundColor:
-                                size === result.recommended_size
-                                  ? '#10b981'
-                                  : '#e5e7eb',
-                            }}
-                          />
-                        </div>
-                        <span className="score-value">{score.toFixed(1)}</span>
-                      </div>
-                    ))}
-                </div>
-              </div>
             </div>
           )}
         </div>
