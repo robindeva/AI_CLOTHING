@@ -6,19 +6,34 @@ import './App.css';
 const API_ENDPOINT = process.env.REACT_APP_API_ENDPOINT || 'YOUR_API_ENDPOINT_HERE';
 
 function App() {
-  const [selectedFile, setSelectedFile] = useState(null);
-  const [previewUrl, setPreviewUrl] = useState(null);
+  const [selectedFiles, setSelectedFiles] = useState({
+    front: null,
+    back: null,
+    side: null
+  });
+  const [previewUrls, setPreviewUrls] = useState({
+    front: null,
+    back: null,
+    side: null
+  });
   const [gender, setGender] = useState('unisex');
   const [height, setHeight] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
+  const [captureMode, setCaptureMode] = useState('single'); // 'single' or 'multi'
 
-  const handleFileSelect = (event) => {
+  const handleFileSelect = (event, angle) => {
     const file = event.target.files[0];
     if (file) {
-      setSelectedFile(file);
-      setPreviewUrl(URL.createObjectURL(file));
+      setSelectedFiles(prev => ({
+        ...prev,
+        [angle]: file
+      }));
+      setPreviewUrls(prev => ({
+        ...prev,
+        [angle]: URL.createObjectURL(file)
+      }));
       setResult(null);
       setError(null);
     }
@@ -27,8 +42,9 @@ function App() {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!selectedFile) {
-      setError('Please select an image first');
+    // Check if at least front image is selected
+    if (!selectedFiles.front) {
+      setError('Please select at least a front-view image');
       return;
     }
 
@@ -42,12 +58,24 @@ function App() {
     setResult(null);
 
     const formData = new FormData();
-    formData.append('image', selectedFile);
+
+    // Add images based on capture mode
+    if (captureMode === 'single') {
+      formData.append('image', selectedFiles.front);
+    } else {
+      // Multi-angle mode
+      if (selectedFiles.front) formData.append('front_image', selectedFiles.front);
+      if (selectedFiles.back) formData.append('back_image', selectedFiles.back);
+      if (selectedFiles.side) formData.append('side_image', selectedFiles.side);
+    }
+
     formData.append('gender', gender);
     formData.append('height', height);
+    formData.append('multi_angle', captureMode === 'multi');
 
     try {
-      const response = await axios.post(`${API_ENDPOINT}analyze`, formData, {
+      const endpoint = captureMode === 'multi' ? 'analyze-multi-angle' : 'analyze';
+      const response = await axios.post(`${API_ENDPOINT}${endpoint}`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
@@ -63,8 +91,16 @@ function App() {
   };
 
   const handleReset = () => {
-    setSelectedFile(null);
-    setPreviewUrl(null);
+    setSelectedFiles({
+      front: null,
+      back: null,
+      side: null
+    });
+    setPreviewUrls({
+      front: null,
+      back: null,
+      side: null
+    });
     setResult(null);
     setError(null);
   };
@@ -135,22 +171,112 @@ function App() {
                 )}
               </div>
 
-              <div className="file-input-wrapper">
-                <input
-                  type="file"
-                  id="file-input"
-                  accept="image/*"
-                  onChange={handleFileSelect}
-                  className="file-input"
-                />
-                <label htmlFor="file-input" className="file-label">
-                  {selectedFile ? 'Change Photo' : 'Choose Photo'}
-                </label>
+              {/* Capture Mode Selector */}
+              <div className="capture-mode-select">
+                <label className="mode-label">Capture Mode:</label>
+                <div className="mode-options">
+                  <label>
+                    <input
+                      type="radio"
+                      value="single"
+                      checked={captureMode === 'single'}
+                      onChange={(e) => setCaptureMode(e.target.value)}
+                    />
+                    Single Photo (Standard)
+                  </label>
+                  <label>
+                    <input
+                      type="radio"
+                      value="multi"
+                      checked={captureMode === 'multi'}
+                      onChange={(e) => setCaptureMode(e.target.value)}
+                    />
+                    Multi-Angle (Higher Accuracy)
+                  </label>
+                </div>
               </div>
 
-              {previewUrl && (
-                <div className="preview-section">
-                  <img src={previewUrl} alt="Preview" className="preview-image" />
+              {/* File Upload Inputs */}
+              {captureMode === 'single' ? (
+                <div className="file-input-wrapper">
+                  <input
+                    type="file"
+                    id="file-input-front"
+                    accept="image/*"
+                    onChange={(e) => handleFileSelect(e, 'front')}
+                    className="file-input"
+                  />
+                  <label htmlFor="file-input-front" className="file-label">
+                    {selectedFiles.front ? 'Change Photo' : 'Choose Photo'}
+                  </label>
+                </div>
+              ) : (
+                <div className="multi-angle-upload">
+                  <div className="angle-upload-item">
+                    <label className="angle-label">Front View (Required)</label>
+                    <input
+                      type="file"
+                      id="file-input-front"
+                      accept="image/*"
+                      onChange={(e) => handleFileSelect(e, 'front')}
+                      className="file-input"
+                    />
+                    <label htmlFor="file-input-front" className="file-label">
+                      {selectedFiles.front ? '✓ Front Photo' : 'Upload Front'}
+                    </label>
+                  </div>
+
+                  <div className="angle-upload-item">
+                    <label className="angle-label">Back View (Optional)</label>
+                    <input
+                      type="file"
+                      id="file-input-back"
+                      accept="image/*"
+                      onChange={(e) => handleFileSelect(e, 'back')}
+                      className="file-input"
+                    />
+                    <label htmlFor="file-input-back" className="file-label">
+                      {selectedFiles.back ? '✓ Back Photo' : 'Upload Back'}
+                    </label>
+                  </div>
+
+                  <div className="angle-upload-item">
+                    <label className="angle-label">Side View (Optional)</label>
+                    <input
+                      type="file"
+                      id="file-input-side"
+                      accept="image/*"
+                      onChange={(e) => handleFileSelect(e, 'side')}
+                      className="file-input"
+                    />
+                    <label htmlFor="file-input-side" className="file-label">
+                      {selectedFiles.side ? '✓ Side Photo' : 'Upload Side'}
+                    </label>
+                  </div>
+                </div>
+              )}
+
+              {/* Preview Section */}
+              {(previewUrls.front || previewUrls.back || previewUrls.side) && (
+                <div className="preview-section-multi">
+                  {previewUrls.front && (
+                    <div className="preview-item">
+                      <span className="preview-label">Front</span>
+                      <img src={previewUrls.front} alt="Front Preview" className="preview-image" />
+                    </div>
+                  )}
+                  {previewUrls.back && (
+                    <div className="preview-item">
+                      <span className="preview-label">Back</span>
+                      <img src={previewUrls.back} alt="Back Preview" className="preview-image" />
+                    </div>
+                  )}
+                  {previewUrls.side && (
+                    <div className="preview-item">
+                      <span className="preview-label">Side</span>
+                      <img src={previewUrls.side} alt="Side Preview" className="preview-image" />
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -158,11 +284,11 @@ function App() {
                 <button
                   type="submit"
                   className="btn btn-primary"
-                  disabled={loading || !selectedFile || !height || height < 100 || height > 250}
+                  disabled={loading || !selectedFiles.front || !height || height < 100 || height > 250}
                 >
                   {loading ? 'Analyzing...' : 'Get Size Recommendation'}
                 </button>
-                {(selectedFile || result) && (
+                {(selectedFiles.front || result) && (
                   <button
                     type="button"
                     className="btn btn-secondary"
