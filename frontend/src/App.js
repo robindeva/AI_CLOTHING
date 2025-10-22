@@ -21,7 +21,6 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
-  const [captureMode, setCaptureMode] = useState('single'); // 'single' or 'multi'
 
   const handleFileSelect = (event, angle) => {
     const file = event.target.files[0];
@@ -59,23 +58,16 @@ function App() {
 
     const formData = new FormData();
 
-    // Add images based on capture mode
-    if (captureMode === 'single') {
-      formData.append('image', selectedFiles.front);
-    } else {
-      // Multi-angle mode
-      if (selectedFiles.front) formData.append('front_image', selectedFiles.front);
-      if (selectedFiles.back) formData.append('back_image', selectedFiles.back);
-      if (selectedFiles.side) formData.append('side_image', selectedFiles.side);
-    }
+    // Multi-angle mode - always use this
+    if (selectedFiles.front) formData.append('front_image', selectedFiles.front);
+    if (selectedFiles.back) formData.append('back_image', selectedFiles.back);
+    if (selectedFiles.side) formData.append('side_image', selectedFiles.side);
 
     formData.append('gender', gender);
     formData.append('height', height);
-    formData.append('multi_angle', captureMode === 'multi');
 
     try {
-      const endpoint = captureMode === 'multi' ? 'analyze-multi-angle' : 'analyze';
-      const response = await axios.post(`${API_ENDPOINT}${endpoint}`, formData, {
+      const response = await axios.post(`${API_ENDPOINT}analyze-multi-angle`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
@@ -171,34 +163,10 @@ function App() {
                 )}
               </div>
 
-              {/* Capture Mode Selector */}
-              <div className="capture-mode-select">
-                <label className="mode-label">Capture Mode:</label>
-                <div className="mode-options">
-                  <label>
-                    <input
-                      type="radio"
-                      value="single"
-                      checked={captureMode === 'single'}
-                      onChange={(e) => setCaptureMode(e.target.value)}
-                    />
-                    Single Photo (Standard)
-                  </label>
-                  <label>
-                    <input
-                      type="radio"
-                      value="multi"
-                      checked={captureMode === 'multi'}
-                      onChange={(e) => setCaptureMode(e.target.value)}
-                    />
-                    Multi-Angle (Higher Accuracy)
-                  </label>
-                </div>
-              </div>
-
-              {/* File Upload Inputs */}
-              {captureMode === 'single' ? (
-                <div className="file-input-wrapper">
+              {/* Multi-Angle File Upload */}
+              <div className="multi-angle-upload">
+                <div className="angle-upload-item">
+                  <label className="angle-label">Front View (Required)</label>
                   <input
                     type="file"
                     id="file-input-front"
@@ -207,54 +175,38 @@ function App() {
                     className="file-input"
                   />
                   <label htmlFor="file-input-front" className="file-label">
-                    {selectedFiles.front ? 'Change Photo' : 'Choose Photo'}
+                    {selectedFiles.front ? '✓ Front Photo' : 'Upload Front'}
                   </label>
                 </div>
-              ) : (
-                <div className="multi-angle-upload">
-                  <div className="angle-upload-item">
-                    <label className="angle-label">Front View (Required)</label>
-                    <input
-                      type="file"
-                      id="file-input-front"
-                      accept="image/*"
-                      onChange={(e) => handleFileSelect(e, 'front')}
-                      className="file-input"
-                    />
-                    <label htmlFor="file-input-front" className="file-label">
-                      {selectedFiles.front ? '✓ Front Photo' : 'Upload Front'}
-                    </label>
-                  </div>
 
-                  <div className="angle-upload-item">
-                    <label className="angle-label">Back View (Optional)</label>
-                    <input
-                      type="file"
-                      id="file-input-back"
-                      accept="image/*"
-                      onChange={(e) => handleFileSelect(e, 'back')}
-                      className="file-input"
-                    />
-                    <label htmlFor="file-input-back" className="file-label">
-                      {selectedFiles.back ? '✓ Back Photo' : 'Upload Back'}
-                    </label>
-                  </div>
-
-                  <div className="angle-upload-item">
-                    <label className="angle-label">Side View (Optional)</label>
-                    <input
-                      type="file"
-                      id="file-input-side"
-                      accept="image/*"
-                      onChange={(e) => handleFileSelect(e, 'side')}
-                      className="file-input"
-                    />
-                    <label htmlFor="file-input-side" className="file-label">
-                      {selectedFiles.side ? '✓ Side Photo' : 'Upload Side'}
-                    </label>
-                  </div>
+                <div className="angle-upload-item">
+                  <label className="angle-label">Back View (Optional)</label>
+                  <input
+                    type="file"
+                    id="file-input-back"
+                    accept="image/*"
+                    onChange={(e) => handleFileSelect(e, 'back')}
+                    className="file-input"
+                  />
+                  <label htmlFor="file-input-back" className="file-label">
+                    {selectedFiles.back ? '✓ Back Photo' : 'Upload Back'}
+                  </label>
                 </div>
-              )}
+
+                <div className="angle-upload-item">
+                  <label className="angle-label">Side View (Optional)</label>
+                  <input
+                    type="file"
+                    id="file-input-side"
+                    accept="image/*"
+                    onChange={(e) => handleFileSelect(e, 'side')}
+                    className="file-input"
+                  />
+                  <label htmlFor="file-input-side" className="file-label">
+                    {selectedFiles.side ? '✓ Side Photo' : 'Upload Side'}
+                  </label>
+                </div>
+              </div>
 
               {/* Preview Section */}
               {(previewUrls.front || previewUrls.back || previewUrls.side) && (
