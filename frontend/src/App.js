@@ -228,6 +228,7 @@ function App() {
               <div className="measurements-card">
                 <h3>Your Measurements (cm)</h3>
                 <div className="measurements-grid">
+                  {/* Primary Measurements */}
                   <div className="measurement-item">
                     <span className="measurement-label">Chest</span>
                     <span className="measurement-value">{result.measurements.chest}</span>
@@ -241,17 +242,73 @@ function App() {
                     <span className="measurement-value">{result.measurements.hips}</span>
                   </div>
                   <div className="measurement-item">
-                    <span className="measurement-label">Inseam</span>
-                    <span className="measurement-value">{result.measurements.inseam}</span>
-                  </div>
-                  <div className="measurement-item">
                     <span className="measurement-label">Shoulder</span>
                     <span className="measurement-value">{result.measurements.shoulder}</span>
                   </div>
                   <div className="measurement-item">
-                    <span className="measurement-label">Arm</span>
+                    <span className="measurement-label">Arm Length</span>
                     <span className="measurement-value">{result.measurements.arm}</span>
                   </div>
+                  <div className="measurement-item">
+                    <span className="measurement-label">Inseam</span>
+                    <span className="measurement-value">{result.measurements.inseam}</span>
+                  </div>
+
+                  {/* New Measurements */}
+                  {result.measurements.neck && (
+                    <div className="measurement-item">
+                      <span className="measurement-label">Neck</span>
+                      <span className="measurement-value">{result.measurements.neck}</span>
+                    </div>
+                  )}
+                  {result.measurements.bicep && (
+                    <div className="measurement-item">
+                      <span className="measurement-label">Bicep</span>
+                      <span className="measurement-value">{result.measurements.bicep}</span>
+                    </div>
+                  )}
+                  {result.measurements.wrist && (
+                    <div className="measurement-item">
+                      <span className="measurement-label">Wrist</span>
+                      <span className="measurement-value">{result.measurements.wrist}</span>
+                    </div>
+                  )}
+                  {result.measurements.thigh && (
+                    <div className="measurement-item">
+                      <span className="measurement-label">Thigh</span>
+                      <span className="measurement-value">{result.measurements.thigh}</span>
+                    </div>
+                  )}
+                  {result.measurements.calf && (
+                    <div className="measurement-item">
+                      <span className="measurement-label">Calf</span>
+                      <span className="measurement-value">{result.measurements.calf}</span>
+                    </div>
+                  )}
+                  {result.measurements.ankle && (
+                    <div className="measurement-item">
+                      <span className="measurement-label">Ankle</span>
+                      <span className="measurement-value">{result.measurements.ankle}</span>
+                    </div>
+                  )}
+                  {result.measurements.torso_length && (
+                    <div className="measurement-item">
+                      <span className="measurement-label">Torso Length</span>
+                      <span className="measurement-value">{result.measurements.torso_length}</span>
+                    </div>
+                  )}
+                  {result.measurements.back_width && (
+                    <div className="measurement-item">
+                      <span className="measurement-label">Back Width</span>
+                      <span className="measurement-value">{result.measurements.back_width}</span>
+                    </div>
+                  )}
+                  {result.measurements.rise && (
+                    <div className="measurement-item">
+                      <span className="measurement-label">Rise</span>
+                      <span className="measurement-value">{result.measurements.rise}</span>
+                    </div>
+                  )}
                 </div>
               </div>
 

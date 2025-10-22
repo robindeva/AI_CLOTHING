@@ -125,6 +125,15 @@ Respond ONLY with valid JSON (no markdown, no explanations outside JSON):
   "inseam": <number in cm, rounded to 1 decimal>,
   "shoulder": <number in cm, rounded to 1 decimal>,
   "arm": <number in cm, rounded to 1 decimal>,
+  "neck": <number in cm, rounded to 1 decimal>,
+  "bicep": <number in cm, rounded to 1 decimal>,
+  "wrist": <number in cm, rounded to 1 decimal>,
+  "thigh": <number in cm, rounded to 1 decimal>,
+  "calf": <number in cm, rounded to 1 decimal>,
+  "ankle": <number in cm, rounded to 1 decimal>,
+  "torso_length": <number in cm, rounded to 1 decimal>,
+  "back_width": <number in cm, rounded to 1 decimal>,
+  "rise": <number in cm, rounded to 1 decimal>,
   "confidence_boost": <integer from -20 to +20>,
   "body_type": "<athletic|slim|average|curvy|plus-size>",
   "adjustment_reason": "<explain key adjustments made, e.g., 'Reduced chest by 8cm due to baggy hoodie, adjusted for slight camera angle'>"
@@ -169,7 +178,8 @@ Respond ONLY with valid JSON (no markdown, no explanations outside JSON):
 
             # Validate measurements are reasonable
             enhanced_measurements = {}
-            for key in ['chest', 'waist', 'hips', 'inseam', 'shoulder', 'arm']:
+            # Process all measurements from basic_measurements (includes all 15)
+            for key in basic_measurements.keys():
                 value = enhanced_data.get(key, basic_measurements[key])
                 # Sanity check: don't allow >30cm deviation from basic measurements
                 if abs(value - basic_measurements[key]) <= 30:
